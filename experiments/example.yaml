@@ -1,0 +1,27 @@
+scenario: "02-Semiurban"
+# Wider windows help sparse arp-spoof / industroyer notifications land inside the slice.
+window_size_s: 90
+stride_s: 20
+resample_step_s: 1
+stage1:
+  model: "autoencoder_mlp"
+  hidden_dim: 256
+  latent_dim: 64
+  epochs: 25
+stage2:
+  model: "mlp_classifier"
+  hidden_dim: 128
+  epochs: 30
+  attack_family_weights:
+    arp-spoof: 4.0
+    industroyer: 4.0
+    drift-off: 2.0
+    control-and-freeze: 1.0
+  inverse_freq_boost: true
+  max_inverse_freq_weight: 4.0
+tuning:
+  max_fpr_on_normal: 0.01
+  max_fpr_on_benign: 0.03
+baseline:
+  model: "isolation_forest"
+seed: 0

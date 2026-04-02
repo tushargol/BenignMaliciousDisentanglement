@@ -1,0 +1,263 @@
+version: '3.8'
+
+services:
+  # Power Systems Data Collection Service
+  power-data-collector:
+    build: 
+      context: ../
+      dockerfile: deployment/services/power-data-collector/Dockerfile
+    volumes:
+      - ./data:/app/data:ro
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    environment:
+      - DATA_SOURCE_TYPE=power_systems
+      - SCADA_HISTORIAN_URL=${SCADA_HISTORIAN_URL}
+      - PMU_DATA_URL=${PMU_DATA_URL}
+      - IEC61850_ENABLED=true
+      - DNP3_ENABLED=true
+      - MODBUS_ENABLED=true
+      - COLLECTION_INTERVAL=1
+      - GRID_TIME_SYNC=true
+    restart: unless-stopped
+    networks:
+      - power-grid-network
+
+  # Power Systems Feature Extraction Service
+  power-feature-extractor:
+    build:
+      context: ../
+      dockerfile: deployment/services/power-feature-extractor/Dockerfile
+    depends_on:
+      - power-data-collector
+    volumes:
+      - ./models:/app/models:ro
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    environment:
+      - WINDOW_SIZE=90
+      - STRIDE=20
+      - RESAMPLE_STEP=1
+      - INPUT_DIM=196
+      - POWER_SYSTEMS_MODE=true
+      - ELECTRICAL_FEATURES=true
+      - PROTECTION_RELAY_FEATURES=true
+      - PMU_FEATURES=true
+    restart: unless-stopped
+    networks:
+      - power-grid-network
+
+  # Power Systems Autoencoder Service (Stage 1)
+  power-autoencoder:
+    build:
+      context: ../
+      dockerfile: deployment/services/power-autoencoder/Dockerfile
+    depends_on:
+      - power-feature-extractor
+    volumes:
+      - ./models:/app/models:ro
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    environment:
+      - MODEL_PATH=/app/models/power_autoencoder.pt
+      - THRESHOLD_PERCENTILE=75
+      - INPUT_DIM=196
+      - HIDDEN_DIM=256
+      - LATENT_DIM=64
+      - POWER_SYSTEMS_MODE=true
+      - GRID_AWARE_TRAINING=true
+      - SUBSTATION_ID=${SUBSTATION_ID:-SUB001}
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    networks:
+      - power-grid-network
+
+  # Power Systems Classifier Service (Stage 2)
+  power-classifier:
+    build:
+      context: ../
+      dockerfile: deployment/services/power-classifier/Dockerfile
+    depends_on:
+      - power-autoencoder
+    volumes:
+      - ./models:/app/models:ro
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    environment:
+      - MODEL_PATH=/app/models/power_classifier.pt
+      - THRESHOLD=0.5
+      - INPUT_DIM=196
+      - HIDDEN_DIM=128
+      - POWER_SYSTEMS_MODE=true
+      - GRID_THREAT_TYPES=true
+      - NERC_CIP_MODE=${NERC_CIP_MODE:-true}
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    networks:
+      - power-grid-network
+
+  # Power Systems Alert Manager
+  power-alert-manager:
+    build:
+      context: ../
+      dockerfile: deployment/services/power-alert-manager/Dockerfile
+    depends_on:
+      - power-classifier
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    environment:
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL}
+      - EMAIL_SMTP=${EMAIL_SMTP}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - SLACK_WEBHOOK=${SLACK_WEBHOOK}
+      - NERC_CIP_MODE=${NERC_CIP_MODE:-true}
+      - GRID_ESCALATION_ENABLED=true
+      - SCADA_HMI_INTEGRATION=true
+      - CONTROL_CENTER_INTEGRATION=true
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    networks:
+      - power-grid-network
+
+  # Power Systems Monitoring Dashboard
+  power-dashboard:
+    build:
+      context: ../
+      dockerfile: deployment/services/power-dashboard/Dockerfile
+    depends_on:
+      - power-alert-manager
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data:ro
+      - ./logs:/app/logs
+    environment:
+      - DATABASE_URL=sqlite:///./data/power_metrics.db
+      - POWER_AUTOENCODER_URL=http://power-autoencoder:8083
+      - POWER_CLASSIFIER_URL=http://power-classifier:8084
+      - POWER_ALERT_MANAGER_URL=http://power-alert-manager:8085
+      - GRID_DASHBOARD_MODE=true
+      - NERC_CIP_DASHBOARD=true
+      - PMU_INTEGRATION=true
+    restart: unless-stopped
+    networks:
+      - power-grid-network
+
+  # Power Systems SCADA Integration Service
+  scada-integration:
+    build:
+      context: ../
+      dockerfile: deployment/services/scada-integration/Dockerfile
+    depends_on:
+      - power-alert-manager
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    environment:
+      - SCADA_PROTOCOLS=iec61850,dnp3,modbus
+      - SCADA_ENDPOINT=${SCADA_ENDPOINT}
+      - IEC61850_SERVER=${IEC61850_SERVER}
+      - DNP3_SERVER=${DNP3_SERVER}
+      - NERC_CIP_MODE=${NERC_CIP_MODE:-true}
+      - SECURE_COMMUNICATION=true
+    ports:
+      - "24000:24000"
+    restart: unless-stopped
+    networks:
+      - power-grid-network
+
+  # Power Systems PMU Data Processor
+  pmu-processor:
+    build:
+      context: ../
+      dockerfile: deployment/services/pmu-processor/Dockerfile
+    depends_on:
+      - power-feature-extractor
+    volumes:
+      - ./data:/app/data:ro
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    environment:
+      - PMU_DATA_SOURCE=${PMU_DATA_URL}
+      - IEEE_C37_118_ENABLED=true
+      - SYNCHROPHASOR_PROCESSING=true
+      - GPS_TIME_SYNC=true
+      - OSCILLATION_DETECTION=true
+      - FREQUENCY_ANALYSIS=true
+    ports:
+      - "24001:24001"
+    restart: unless-stopped
+    networks:
+      - power-grid-network
+
+  # Prometheus for Power Systems Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/power-prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    restart: unless-stopped
+    networks:
+      - power-grid-network
+
+  # Grafana for Power Systems Visualization
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/power-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/power-datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-grid-admin123}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    restart: unless-stopped
+    networks:
+      - power-grid-network
+
+  # NERC CIP Compliance Monitor
+  nerc-cip-monitor:
+    build:
+      context: ../
+      dockerfile: deployment/services/nerc-cip-monitor/Dockerfile
+    depends_on:
+      - power-alert-manager
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - ./compliance:/app/compliance
+    environment:
+      - NERC_CIP_MODE=${NERC_CIP_MODE:-true}
+      - COMPLIANCE_REPORTING=true
+      - AUDIT_LOGGING=true
+      - SECURITY_ASSESSMENT=true
+    ports:
+      - "8086:8086"
+    restart: unless-stopped
+    networks:
+      - power-grid-network
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  power-grid-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

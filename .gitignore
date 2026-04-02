@@ -74,8 +74,9 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environments - SECURITY: Exclude all environment files
 .env
+.env.*
 .venv
 env/
 venv/
@@ -130,6 +131,11 @@ data/02-Semiurban/
 data/
 paper.pdf
 
+# Project documentation (exclude from git)
+capstone_project_details.md
+*.md
+!README.md
+
 # Keep structure but ignore large datasets
 # 02-Semiurban/*.gz
 # 02-Semiurban/*.zip
@@ -165,3 +171,107 @@ Thumbs.db
 *.json
 !experiments/*.json
 !requirements.txt
+
+# SECURITY: Deployment and credential files
+deployment/.env
+deployment/.env.*
+deployment/config/secrets.yaml
+deployment/config/credentials.yaml
+deployment/config/private_keys/
+deployment/config/certificates/
+deployment/logs/
+deployment/data/*.json
+deployment/data/*.csv
+deployment/data/*.db
+deployment/compliance/
+deployment/monitoring/grafana/data/
+deployment/monitoring/prometheus/data/
+
+# SECURITY: Power systems sensitive data
+deployment/config/scada_credentials.yaml
+deployment/config/substation_configs/
+deployment/config/grid_secrets.yaml
+
+# SECURITY: Docker and container secrets
+.dockerignore
+docker-compose.override.yml
+docker-compose.prod.yml
+docker-compose.staging.yml
+
+# SECURITY: TLS/SSL certificates
+*.pem
+*.key
+*.crt
+*.ca
+*.csr
+certificates/
+ssl/
+tls/
+
+# SECURITY: Database files
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+database/
+databases/
+
+# SECURITY: Backup and archive files
+*.backup
+*.bak
+*.old
+*.orig
+*.rej
+backups/
+archives/
+
+# SECURITY: Sensitive configuration files
+config/secrets.yaml
+config/private.yaml
+config/credentials.yaml
+config/production.yaml
+config/staging.yaml
+
+# SECURITY: Authentication and authorization
+auth_tokens.txt
+api_keys.txt
+passwords.txt
+secrets.txt
+.jupyter/
+.kube/
+
+# SECURITY: Monitoring and analytics data
+analytics/
+monitoring/data/
+metrics/data/
+traces/
+logs/production/
+logs/staging/
+
+# SECURITY: Cloud provider credentials
+.aws/
+.azure/
+.gcp/
+.google/
+kubeconfig/
+service-account.json
+
+# SECURITY: SSH and access keys
+*.pem
+id_rsa*
+id_ed25519*
+known_hosts
+ssh/
+
+# SECURITY: Power systems operational data
+scada_logs/
+pmu_data/
+relay_events/
+grid_state/
+operational_data/
+
+# SECURITY: Compliance and audit logs
+audit/
+compliance_reports/
+security_scans/
+vulnerability_reports/

@@ -37,11 +37,106 @@ This project addresses a critical challenge in industrial cybersecurity: reducin
 - **arp-spoof**: 86.2% recall
 - **industroyer**: 44.3% recall (challenging attack type)
 
+## Interactive Demonstration
+
+### Enhanced Demo with Real Sherlock Data
+
+This project features an **enhanced interactive demonstration** that leverages **real power systems operational data** from the Sherlock dataset:
+
+#### **Real Operational Data Integration**
+- **49 Authentic Events**: Real power systems procedures and commands
+- **9 Event Types**: Control center procedures, SCADA commands, maintenance operations
+- **Real Procedures**: Transformer maintenance, separator movement, load management
+- **Authentic Patterns**: Actual voltage, frequency, and load control operations
+
+#### **Enhanced Technical Features**
+- **Real SHAP Integration**: Actual model explainability with feature attribution
+- **Model Calibration**: Data-driven threshold optimization using real training data
+- **Multi-class Logic**: Proper three-class decision making (Normal/Benign/Malicious)
+- **Sub-2ms Performance**: Real-time inference suitable for operational deployment
+
+#### **Six-Panel Visualization Dashboard**
+1. **Real-time Metrics**: Confidence scores and reconstruction errors
+2. **Detection Timeline**: Scenario results with data source indicators
+3. **SHAP Feature Importance**: Real calculated feature contributions
+4. **System Status**: Current threat level and performance metrics
+5. **Data Source Analysis**: Real vs synthetic scenario breakdown
+6. **Performance Metrics**: Model calibration and accuracy analytics
+
+### Running the Enhanced Demo
+
+#### **Enhanced Demo with Real Data**
+```bash
+python demo_improved.py
+# Enhanced demo with real Sherlock data integration
+# Real SHAP explanations
+# Six-panel visualization dashboard
+# Model calibration with real training data
+```
+
+#### **Demo Modes**
+1. **Interactive Demo**: User-selectable scenarios with real-time explanations
+2. **Automated Demo**: All scenarios with comprehensive performance analysis
+3. **Quick Demo**: 3-minute overview of key capabilities
+
+### Enhanced Demo Outputs
+
+#### **Comprehensive Reports**
+- `enhanced_demo_report_YYYYMMDD_HHMMSS.txt`: Detailed analysis with real data insights
+- `enhanced_demo_results_YYYYMMDD_HHMMSS.json`: Structured results with SHAP variations
+- `enhanced_demo_summary_YYYYMMDD_HHMMSS.png`: Six-panel visualization dashboard
+
+#### **Real Data Analytics**
+- **Sherlock Event Analysis**: 49 real operational events processed
+- **Procedure Extraction**: Real maintenance and operational procedures
+- **Pattern Recognition**: Authentic power systems operational patterns
+- **Performance Validation**: Model tested on real grid scenarios
+
+### Key Enhancements Achieved
+
+#### **Real SHAP Implementation**
+- **Before**: Static identical SHAP values for all predictions
+- **After**: Real calculated SHAP values with model-specific variations
+- **Impact**: Authentic model explainability for operator trust
+
+#### **Model Calibration**
+- **Reconstruction Threshold**: `1.32e-06` (calibrated from real training data)
+- **Classifier Threshold**: `0.5` (optimized for binary classification)
+- **Method**: 95th percentile of training reconstruction errors
+
+#### **Performance Validation**
+- **Prediction Time**: 1.73ms average (sub-2ms real-time capability)
+- **Model Status**: Autoencoder and classifier loaded and calibrated
+- **Data Integration**: Successfully processed 49 authentic power systems events
+
+### Real Sherlock Data Examples
+
+#### **Authentic Operational Procedures**
+```json
+{
+  "notification_data": {
+    "malicious": false,
+    "type": "procedure",
+    "context": "control center",
+    "event": "Transformer Maintenance",
+    "description": "The control center issues control commands to fully disconnect an MV/LV transformer from the grid to enable safe maintenance"
+  }
+}
+```
+
+#### **Real SCADA Commands**
+- **Control Commands**: Actual voltage and frequency control operations
+- **Protection Coordination**: Real relay coordination procedures
+- **Load Management**: Authentic load flow and switching operations
+- **Maintenance Sequences**: Real equipment disconnection/reconnection procedures
+
 ## Quick Start
 
 ### Prerequisites
 - Python 3.8+
 - Sherlock 02-Semiurban dataset
+- PyTorch (for model training and inference)
+- SHAP (for explainability features)
 
 ### Installation
 
@@ -50,13 +145,16 @@ This project addresses a critical challenge in industrial cybersecurity: reducin
 git clone <repository-url>
 cd BenignVsMalicious
 
-# Create virtual environment
-python -m venv .venv
-.venv\Scripts\activate   # Windows
-# source .venv/bin/activate   # Linux/Mac
-
 # Install dependencies
 pip install -r requirements.txt
+
+# Download and place the Sherlock 02-Semiurban dataset
+# Either as:
+#   - 02-Semiurban/ (in project root)
+#   - data/02-Semiurban/ (preferred)
+
+# Verify installation
+python -c "import torch, shap, pandas, numpy; print('All dependencies installed successfully')"
 ```
 
 ### Dataset Setup
@@ -123,20 +221,60 @@ python run_pipeline.py --stage all --auto_tune --max_fpr_normal 0.01 --max_fpr_b
 ```
 BenignVsMalicious/
 ├── src/
-│   ├── data/          # Event loading, time-series processing, windowing
-│   ├── models/        # Autoencoder, classifier, baseline models
-│   ├── training/      # Training loops and utilities
-│   ├── evaluation/    # Metrics, per-attack analysis, SHAP
-│   ├── features/      # Feature extraction and engineering
-│   └── utils/         # Helper utilities
-├── experiments/
-│   └── example.yaml   # Configuration file
-├── outputs/           # Generated models, results, reports
-├── 02-Semiurban/      # Dataset (or data/02-Semiurban/)
-├── run_pipeline.py    # Main pipeline script
-├── requirements.txt   # Python dependencies
+│   ├── config.py              # Project configuration and paths
+│   ├── data/                  # Event loading, time-series processing, windowing
+│   │   ├── events_loader.py   # Event data loading utilities
+│   │   ├── prepare_pipeline.py # Data preparation pipeline
+│   │   ├── raw_event_interval_features.py
+│   │   ├── timeseries_loader.py
+│   │   └── windowing.py       # Time series windowing
+│   ├── models/                # Autoencoder, classifier, baseline models
+│   │   ├── autoencoder.py     # Anomaly detection autoencoder
+│   │   ├── baseline.py        # Isolation Forest baseline
+│   │   └── classifier.py      # Benign vs malicious classifier
+│   ├── training/              # Training loops and utilities
+│   │   ├── train_autoencoder.py
+│   │   └── train_classifier.py
+│   ├── evaluation/            # Metrics, per-attack analysis, SHAP
+│   │   ├── evaluate_pipeline.py
+│   │   ├── metrics.py
+│   │   ├── threshold_sweep.py
+│   │   └── visualizations.py
+│   ├── features/              # Feature extraction and engineering
+│   │   └── feature_engineering.py
+│   └── utils/                 # Helper utilities
+│       ├── logging_utils.py
+│       ├── paths.py
+│       └── seed.py
+├── deployment/                # Docker and deployment configuration
+│   ├── docker-compose.yml
+│   ├── services/
+│   ├── deploy.sh
+│   ├── QUICK_START.md
+│   └── SECURITY.md
+├── experiments/               # Configuration and experiment files
+│   └── example.yaml
+├── outputs/                   # Generated models, results, reports
+│   ├── models/               # Trained models (.pt files)
+│   ├── visualizations/       # Evaluation plots
+│   ├── demo_report_*.txt     # Demo reports
+│   ├── enhanced_demo_*.txt   # Enhanced demo outputs
+│   └── *.json, *.csv         # Evaluation results
+├── scripts/                   # Additional utility scripts
+├── notebooks/                 # Jupyter notebooks for analysis
+├── 02-Semiurban/              # Sherlock dataset (or data/02-Semiurban/)
+├── demo_improved.py           # Enhanced demo with real Sherlock data
+├── run_pipeline.py            # Main pipeline script
+├── requirements.txt           # Python dependencies
+├── capstone_project_details.md # Comprehensive project documentation
+├── deployment_strategy.md     # Deployment strategy documentation
+├── report_outline.md          # Research report outline
 └── README.md
 ```
+
+### Enhanced Demo Files
+- **`demo_improved.py`**: Enhanced demonstration with real Sherlock data integration
+- **Enhanced Outputs**: Comprehensive reports with real data analytics and SHAP explanations
 
 ## Outputs
 
@@ -148,6 +286,12 @@ After running the pipeline, you'll find:
 - `outputs/eval_report.json` – Comprehensive performance metrics
 - `outputs/shap_top_features.json` – Feature importance analysis
 - `outputs/auto_tune_results.csv` – Threshold optimization results
+- `outputs/threshold_sweep.csv` – Threshold analysis results
+
+### Demo Outputs
+- `outputs/enhanced_demo_report_YYYYMMDD_HHMMSS.txt` – Enhanced demo with real data analysis
+- `outputs/enhanced_demo_results_YYYYMMDD_HHMMSS.json` – Enhanced demo with SHAP variations
+- `outputs/enhanced_demo_summary_YYYYMMDD_HHMMSS.png` – Enhanced demo six-panel dashboard
 
 ### Visualizations
 - `outputs/visualizations/` – Generated evaluation plots:

@@ -853,5 +853,5 @@ This research uses the **Sherlock 02-Semiurban Dataset** provided by the origina
 
 The dataset enables research in anomaly detection for industrial environments and contains realistic attack scenarios critical for advancing cybersecurity in critical infrastructure.
 
-For full dataset details, licensing terms, and citation information, please visit: https://zenodo.org/records/18467070
+For full dataset details, licensing terms, and citation information, please visit: https://sherlock.wattson.it
 

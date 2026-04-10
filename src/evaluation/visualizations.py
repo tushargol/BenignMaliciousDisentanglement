@@ -232,6 +232,49 @@ def plot_shap_feature_importance(
     return fig
 
 
+def plot_shap_beeswarm(
+    shap_values: np.ndarray,
+    feature_names: List[str],
+    save_path: Optional[Path] = None,
+) -> plt.Figure:
+    """Plot SHAP beeswarm plot showing feature impact distribution across samples."""
+    try:
+        import shap
+    except ImportError:
+        print("SHAP library not available for beeswarm plot")
+        return None
+    
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Create a simple beeswarm-like visualization using matplotlib
+    # Calculate mean absolute SHAP values for feature ordering
+    mean_abs_shap = np.mean(np.abs(shap_values), axis=0)
+    feature_order = np.argsort(mean_abs_shap)[::-1][:20]  # Top 20 features
+    
+    # Plot beeswarm
+    for i, feature_idx in enumerate(feature_order):
+        feature_shap = shap_values[:, feature_idx]
+        y_positions = np.random.normal(i, 0.3, len(feature_shap))
+        
+        # Color points by SHAP value (red=positive, blue=negative)
+        colors = ['red' if val > 0 else 'blue' for val in feature_shap]
+        sizes = [abs(val) * 100 for val in feature_shap]
+        
+        ax.scatter(feature_shap, y_positions, c=colors, s=sizes, alpha=0.6)
+    
+    ax.set_yticks(range(len(feature_order)))
+    ax.set_yticklabels([feature_names[i] for i in feature_order])
+    ax.set_xlabel('SHAP Value (Impact on Model Output)')
+    ax.set_title('SHAP Beeswarm Plot - Feature Impact Distribution')
+    ax.axvline(x=0, color='black', linestyle='--', linewidth=1)
+    ax.grid(True, alpha=0.3, axis='x')
+    
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    return fig
+
+
 def create_evaluation_dashboard(
     eval_result: Any,
     y_true: np.ndarray,

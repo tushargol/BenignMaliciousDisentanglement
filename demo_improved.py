@@ -229,8 +229,48 @@ class ImprovedPowerSystemsIDSDemo:
                     'features': self.generate_voltage_attack_features(),
                     'expected_label': 'Malicious Attack',
                     'source': 'synthetic_attack'
+                },
+                'industroyer_attack': {
+                    'description': 'Industroyer-style sophisticated malware attack (stealthy protocol manipulation)',
+                    'features': self.generate_industroyer_attack_features(),
+                    'expected_label': 'Malicious Attack',
+                    'source': 'synthetic_industroyer'
+                },
+                'multi_stage_attack': {
+                    'description': 'Multi-stage attack starting as benign-looking event and escalating to malicious',
+                    'features': self.generate_multi_stage_attack_features(),
+                    'expected_label': 'Malicious Attack',
+                    'source': 'synthetic_multi_stage'
                 }
             })
+    
+    def generate_relay_attack_features(self):
+        """Generate relay attack features"""
+        features = np.random.randn(196) * 0.08
+        features[60:90] += np.random.normal(1.5, 0.3, 30)
+        features[0:20] += np.random.normal(-0.4, 0.1, 20)
+        return features
+    
+    def generate_voltage_attack_features(self):
+        """Generate voltage attack features"""
+        features = np.random.randn(196) * 0.08
+        features[0:25] += np.random.normal(-0.5, 0.1, 25)
+        features[40:50] += np.random.normal(2.0, 0.2, 10)
+        return features
+    
+    def generate_industroyer_attack_features(self):
+        """Generate Industroyer attack features (stealthy)"""
+        features = np.random.randn(196) * 0.05
+        features[120:140] += np.random.normal(0.3, 0.05, 20)
+        features[60:90] += np.random.normal(0.4, 0.08, 30)
+        return features
+    
+    def generate_multi_stage_attack_features(self):
+        """Generate multi-stage attack features"""
+        features = np.random.randn(196) * 0.05
+        features[0:98] += np.random.normal(0.05, 0.01, 98)
+        features[98:140] += np.random.normal(1.5, 0.2, 42)
+        return features
         
         print(f" Created {len(self.scenarios)} realistic scenarios")
     
@@ -328,6 +368,18 @@ class ImprovedPowerSystemsIDSDemo:
                 'features': self.generate_enhanced_pmu_attack_features(),
                 'expected_label': 'Malicious Attack',
                 'source': 'enhanced_synthetic'
+            },
+            'industroyer_attack': {
+                'description': 'Industroyer-style sophisticated malware attack (stealthy protocol manipulation)',
+                'features': self.generate_enhanced_industroyer_features(),
+                'expected_label': 'Malicious Attack',
+                'source': 'enhanced_synthetic'
+            },
+            'multi_stage_attack': {
+                'description': 'Multi-stage attack starting as benign-looking event and escalating to malicious',
+                'features': self.generate_enhanced_multi_stage_features(),
+                'expected_label': 'Malicious Attack',
+                'source': 'enhanced_synthetic'
             }
         }
     
@@ -387,6 +439,35 @@ class ImprovedPowerSystemsIDSDemo:
         features[160:196] += np.random.normal(3.5, 0.3, 36)   # PMU corruption
         features[30:40] += np.random.normal(1.5, 0.1, 10)    # Phase angle issues
         features[180:196] += np.random.normal(2.0, 0.2, 16)   # GPS sync problems
+        
+        return features
+    
+    def generate_enhanced_industroyer_features(self):
+        """Generate enhanced Industroyer attack features (stealthy protocol manipulation)"""
+        features = self.generate_enhanced_normal_features()
+        
+        # Industroyer characteristics: stealthy, protocol-level manipulation
+        # Subtle changes that are hard to detect (reflecting the 44.3% detection rate)
+        features[120:140] += np.random.normal(0.3, 0.05, 20)  # Subtle command anomalies
+        features[60:90] += np.random.normal(0.4, 0.08, 30)    # Slight protocol deviations
+        features[140:160] += np.random.normal(0.5, 0.1, 20)   # Timing-based signatures
+        features[0:10] += np.random.normal(0.2, 0.03, 10)     # Minor voltage fluctuations
+        
+        # Note: These are designed to be subtle, reflecting why Industroyer is hard to detect
+        return features
+    
+    def generate_enhanced_multi_stage_features(self):
+        """Generate enhanced multi-stage attack features"""
+        features = self.generate_enhanced_normal_features()
+        
+        # Multi-stage attack: starts benign-looking, then escalates
+        # First half: benign-like patterns
+        features[0:98] += np.random.normal(0.05, 0.01, 98)   # Slight benign deviations
+        
+        # Second half: malicious escalation
+        features[98:120] += np.random.normal(1.2, 0.15, 22)  # Escalating command patterns
+        features[120:140] += np.random.normal(1.8, 0.2, 20)  # Unauthorized commands
+        features[140:160] += np.random.normal(2.0, 0.25, 20) # Coordinated attack
         
         return features
     

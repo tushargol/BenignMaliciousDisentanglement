@@ -807,6 +807,381 @@ python run_pipeline.py --stage all --ablation stage1_only
 python run_pipeline.py --stage all --ablation no_classifier
 ```
 
+## New Features and Testing Guide
+
+This section documents the new features added to enhance the project and provides instructions for testing them.
+
+### 1. New Autoencoder Architectures
+
+Three new autoencoder architectures have been added for temporal and spatial pattern detection:
+
+#### LSTM Autoencoder
+- **Location**: `src/models/lstm_autoencoder.py`
+- **Features**: Captures temporal patterns in time-series data
+- **Models**: `LSTMAutoencoder`, `ConvLSTMAutoencoder`
+
+#### CNN Autoencoder
+- **Location**: `src/models/cnn_autoencoder.py`
+- **Features**: Spatial feature extraction with convolutional layers
+- **Models**: `CNNAutoencoder`, `ResidualCNNAutoencoder`
+
+#### VAE (Variational Autoencoder)
+- **Location**: `src/models/vae_autoencoder.py`
+- **Features**: Probabilistic latent space for uncertainty modeling
+- **Models**: `VAEAutoencoder`, `BetaVAE`, `ConditionalVAE`
+
+#### Testing New Architectures
+
+To use a new architecture, modify the model loading in your training script:
+
+```python
+# Example: Using LSTM Autoencoder
+from src.models.lstm_autoencoder import LSTMAutoencoder
+
+model = LSTMAutoencoder(
+    input_dim=196,
+    hidden_dim=128,
+    latent_dim=64,
+    num_layers=2
+)
+```
+
+### 2. Enhanced Threshold Optimization
+
+Threshold optimization has been expanded with a broader search space and sensitivity heatmap generation.
+
+#### New Features
+- **Expanded Search Space**: AE percentile (60-95), classifier threshold (0.2-0.8)
+- **Sensitivity Heatmap**: Visualizes performance across threshold combinations
+- **CSV Export**: Detailed results of all threshold combinations
+
+#### Testing Threshold Optimization
+
+```bash
+# Run with auto-tuning enabled
+python run_pipeline.py --stage all --auto_tune
+
+# View generated outputs
+# - outputs/auto_tune_results.csv: Detailed threshold search results
+# - outputs/threshold_sensitivity_heatmap.png: Sensitivity visualization
+```
+
+#### Configuration in YAML
+
+Edit `experiments/example.yaml`:
+
+```yaml
+tuning:
+  max_fpr_on_normal: 0.01
+  max_fpr_on_benign: 0.03
+  ae_percentile: 80.0      # New: Configurable via YAML
+  clf_threshold: 0.5        # New: Configurable via YAML
+  benign_ctrl_threshold: 0.01  # New: Configurable via YAML
+```
+
+### 3. Cross-Validation Module
+
+Statistical validity assessment through k-fold cross-validation.
+
+#### Location
+- `src/evaluation/cross_validation.py`
+
+#### Features
+- **Autoencoder Cross-Validation**: `cross_validate_autoencoder()`
+- **Classifier Cross-Validation**: `cross_validate_classifier()`
+- **Result Summarization**: Mean, std, min, max across folds
+- **Formatted Output**: Easy-to-read CV summaries
+
+#### Testing Cross-Validation
+
+```python
+from src.evaluation.cross_validation import cross_validate_autoencoder, print_cv_summary
+
+# Run 5-fold cross-validation for autoencoder
+cv_results = cross_validate_autoencoder(
+    X=X_train,
+    input_dim=196,
+    hidden_dim=256,
+    latent_dim=64,
+    n_folds=5,
+    epochs=25,
+    device='cuda'
+)
+
+# Print summary
+print_cv_summary(cv_results, model_name="Autoencoder")
+```
+
+### 4. SHAP-Driven Feature Selection
+
+Feature selection based on SHAP importance scores to prune low-importance features.
+
+#### Location
+- `src/features/feature_selection.py`
+
+#### Features
+- **Feature Selection**: Select top N% features by SHAP importance
+- **Feature Pruning**: Remove bottom features from datasets
+- **Ranking**: Get feature importance ranking
+- **Pipeline Integration**: Apply selection to train/val/test sets
+
+#### Testing Feature Selection
+
+```python
+from src.features.feature_selection import (
+    select_features_by_shap,
+    prune_features,
+    apply_feature_selection_pipeline
+)
+
+# Select features (keep top 80%)
+feature_indices, feature_names = select_features_by_shap(
+    shap_values=shap_values,
+    keep_percentage=0.8
+)
+
+# Prune datasets
+X_train_pruned = prune_features(X_train, feature_indices)
+X_val_pruned = prune_features(X_val, feature_indices)
+X_test_pruned = prune_features(X_test, feature_indices)
+
+# Or use the pipeline function
+X_train_pruned, X_val_pruned, X_test_pruned, indices = apply_feature_selection_pipeline(
+    X_train, X_val, X_test, shap_values, keep_percentage=0.8
+)
+```
+
+### 5. Modular Pipeline Stages
+
+Pipeline has been refactored for independent Stage 1 and Stage 2 execution.
+
+#### Locations
+- `src/pipeline/stage1.py`: Autoencoder training/inference
+- `src/pipeline/stage2.py`: Classifier training/inference
+
+#### Features
+- **Independent Execution**: Train or use each stage separately
+- **Model Loading**: Load pre-trained models independently
+- **Inference**: Run inference for specific stages
+- **Rule-Based Rescue**: Apply rescue logic for specific attack families
+
+#### Testing Modular Pipeline
+
+```python
+from src.pipeline.stage1 import train_stage1, load_stage1, infer_stage1
+from src.pipeline.stage2 import train_stage2, load_stage2, infer_stage2
+
+# Train Stage 1 independently
+ae_model = train_stage1(
+    X_train=X_train,
+    X_val=X_val,
+    input_dim=196,
+    hidden_dim=256,
+    latent_dim=64,
+    model_save_path=Path("outputs/models/autoencoder.pt")
+)
+
+# Load and run Stage 1 inference
+ae_model = load_stage1(
+    model_path=Path("outputs/models/autoencoder.pt"),
+    input_dim=196
+)
+reconstruction_errors = infer_stage1(ae_model, X_test)
+
+# Train Stage 2 independently
+clf_model = train_stage2(
+    X_train=X_anomalous,
+    y_train=y_anomalous,
+    X_val=X_val_anomalous,
+    y_val=y_val_anomalous,
+    input_dim=196,
+    hidden_dim=128,
+    model_save_path=Path("outputs/models/classifier.pt")
+)
+```
+
+### 6. Experiment Tracking
+
+Integration with MLflow and Weights & Biases for experiment tracking.
+
+#### Location
+- `src/experiment_tracking.py`
+
+#### Features
+- **MLflow Integration**: Log parameters, metrics, and artifacts
+- **Weights & Biases Integration**: W&B experiment tracking
+- **Simple Fallback**: File-based tracking when MLflow/W&B unavailable
+- **Unified Interface**: Consistent API across backends
+
+#### Testing Experiment Tracking
+
+```python
+from src.experiment_tracking import get_tracker
+
+# Auto-detect available backend or specify explicitly
+tracker = get_tracker(tracking_backend="mlflow")
+
+# Initialize experiment
+tracker.init_experiment(
+    experiment_name="ids_experiment_001",
+    config={"hidden_dim": 256, "latent_dim": 64}
+)
+
+# Log hyperparameters
+tracker.log_params({"lr": 0.001, "batch_size": 256})
+
+# Log metrics during training
+tracker.log_metrics({"train_loss": 0.1, "val_loss": 0.15}, step=1)
+
+# Log artifacts (models, visualizations)
+tracker.log_artifact("outputs/models/autoencoder.pt", "autoencoder")
+
+# End experiment run
+tracker.end_run()
+```
+
+#### Installation
+
+```bash
+# For MLflow
+pip install mlflow
+
+# For Weights & Biases
+pip install wandb
+```
+
+### 7. Unit Tests
+
+Comprehensive test suite for critical functions.
+
+#### Locations
+- `tests/test_features.py`: Feature extraction tests
+- `tests/test_pipeline.py`: Pipeline logic tests
+- `pytest.ini`: Test configuration
+
+#### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_features.py
+
+# Run with coverage
+pytest --cov=src tests/
+```
+
+#### Test Coverage
+
+- **Feature Extraction**: Window statistics, edge cases, NaN handling
+- **Pipeline Logic**: Confusion matrix, threshold classification, data splits
+- **Sample Weighting**: Weight application in loss calculation
+- **Data Leakage Prevention**: Train/test split validation
+
+### 8. New Demo Scenarios
+
+Enhanced demo with additional attack scenarios.
+
+#### New Scenarios
+- **Industroyer Attack**: Stealthy protocol manipulation (reflecting 44.3% detection rate)
+- **Multi-Stage Attack**: Escalating attack from benign-looking to malicious
+
+#### Testing New Demo Scenarios
+
+```bash
+# Run enhanced demo with new scenarios
+python demo_improved.py
+
+# The demo now includes:
+# - industroyer_attack: Stealthy protocol manipulation scenario
+# - multi_stage_attack: Escalating attack scenario
+```
+
+#### Feature Generation
+
+The new scenarios have specialized feature generation functions:
+- `generate_industroyer_attack_features()`: Subtle, hard-to-detect patterns
+- `generate_multi_stage_attack_features()`: Escalating pattern from benign to malicious
+
+### 9. Enhanced Visualizations
+
+New visualization added to the evaluation pipeline.
+
+#### SHAP Beeswarm Plot
+
+**Location**: `src/evaluation/visualizations.py`
+
+**Function**: `plot_shap_beeswarm()`
+
+**Features**: Shows feature impact distribution across samples with color-coding for positive/negative contributions
+
+#### Testing SHAP Beeswarm
+
+```python
+from src.evaluation.visualizations import plot_shap_beeswarm
+
+# Generate beeswarm plot
+fig = plot_shap_beeswarm(
+    shap_values=shap_values,
+    feature_names=feature_names,
+    save_path=Path("outputs/visualizations/shap_beeswarm.png")
+)
+```
+
+### Quick Testing Checklist
+
+To test all new features systematically:
+
+```bash
+# 1. Test threshold optimization
+python run_pipeline.py --stage all --auto_tune
+
+# 2. Run unit tests
+pytest -v
+
+# 3. Test enhanced demo
+python demo_improved.py
+
+# 4. Test modular pipeline (requires Python script)
+# Create a test script using examples from sections above
+
+# 5. Test experiment tracking (requires MLflow or W&B installation)
+# Create a test script using examples from section 6
+
+# 6. Test cross-validation (requires Python script)
+# Create a test script using examples from section 3
+
+# 7. Test feature selection (requires Python script)
+# Create a test script using examples from section 4
+```
+
+### Configuration Updates
+
+The YAML configuration file has been enhanced with new parameters:
+
+```yaml
+# experiments/example.yaml
+tuning:
+  max_fpr_on_normal: 0.01
+  max_fpr_on_benign: 0.03
+  ae_percentile: 80.0      # NEW: Autoencoder threshold
+  clf_threshold: 0.5        # NEW: Classifier threshold
+  benign_ctrl_threshold: 0.01  # NEW: Benign control threshold
+
+sample_weights:
+  attack_family_weights:
+    arp-spoof: 4.0
+    industroyer: 8.0         # UPDATED: Increased from 4.0
+    drift-off: 2.0
+    control-and-freeze: 1.0
+  inverse_freq_boost: true
+  max_inverse_freq_weight: 8.0  # NEW: Max inverse frequency weight
+```
+
 ## Requirements
 
 - `pandas` - Data manipulation

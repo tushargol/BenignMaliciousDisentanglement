@@ -14,14 +14,17 @@ stage2:
   epochs: 30
   attack_family_weights:
     arp-spoof: 4.0
-    industroyer: 4.0
+    industroyer: 8.0
     drift-off: 2.0
     control-and-freeze: 1.0
   inverse_freq_boost: true
-  max_inverse_freq_weight: 4.0
+  max_inverse_freq_weight: 8.0
 tuning:
   max_fpr_on_normal: 0.01
   max_fpr_on_benign: 0.03
+  ae_percentile: 80.0
+  clf_threshold: 0.5
+  benign_ctrl_threshold: 0.01
 baseline:
   model: "isolation_forest"
 seed: 0

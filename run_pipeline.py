@@ -91,6 +91,19 @@ def main() -> None:
     paths = Paths.auto()
     config_path = args.config or paths.repo_root / "experiments" / "example.yaml"
     paths.outputs_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Load config to get default threshold values if not specified via command line
+    import yaml
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    tuning_cfg = config.get('tuning', {})
+    if args.ae_percentile == 80.0 and 'ae_percentile' in tuning_cfg:
+        args.ae_percentile = tuning_cfg['ae_percentile']
+    if args.clf_threshold == 0.5 and 'clf_threshold' in tuning_cfg:
+        args.clf_threshold = tuning_cfg['clf_threshold']
+    if args.benign_ctrl_threshold == 0.01 and 'benign_ctrl_threshold' in tuning_cfg:
+        args.benign_ctrl_threshold = tuning_cfg['benign_ctrl_threshold']
     prepared_path = paths.outputs_dir / "prepared.pkl"
     models_path = paths.outputs_dir / "models"
 
@@ -249,9 +262,10 @@ def main() -> None:
                 baseline = pickle.load(f)
 
         if args.auto_tune and clf is not None:
-            ae_grid = [75.0, 80.0, 85.0, 90.0, 95.0]
-            clf_grid = [0.3, 0.5, 0.7]
-            benign_grid = [0.0, 0.005, 0.01, 0.02]
+            # Expanded threshold search space for comprehensive optimization
+            ae_grid = np.arange(60.0, 96.0, 5.0).tolist()  # 60, 65, 70, 75, 80, 85, 90, 95
+            clf_grid = np.arange(0.2, 0.9, 0.1).tolist()  # 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8
+            benign_grid = [0.0, 0.005, 0.01, 0.02, 0.03]
             rows = []
             best_score = -1.0
             best_params = (args.ae_percentile, args.clf_threshold, args.benign_ctrl_threshold)
@@ -332,6 +346,38 @@ def main() -> None:
                 writer.writeheader()
                 for row in rows:
                     writer.writerow(row)
+            
+            # Generate threshold sensitivity heatmap
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            
+            # Create pivot table for heatmap (AE percentile vs classifier threshold, using malicious F1)
+            pivot_data = {}
+            for row in rows:
+                ae_p = row['ae_percentile']
+                clf_t = row['clf_threshold']
+                if ae_p not in pivot_data:
+                    pivot_data[ae_p] = {}
+                pivot_data[ae_p][clf_t] = row['malicious_f1']
+            
+            # Convert to arrays for plotting
+            ae_vals = sorted(pivot_data.keys())
+            clf_vals = sorted(list(set(row['clf_threshold'] for row in rows)))
+            heatmap_data = [[pivot_data[ae].get(clf, 0) for clf in clf_vals] for ae in ae_vals]
+            
+            fig, ax = plt.subplots(figsize=(12, 8))
+            sns.heatmap(heatmap_data, 
+                       xticklabels=[f'{t:.1f}' for t in clf_vals],
+                       yticklabels=[f'{p:.0f}' for p in ae_vals],
+                       annot=True, fmt='.3f', cmap='YlOrRd', ax=ax)
+            ax.set_xlabel('Classifier Threshold')
+            ax.set_ylabel('AE Percentile')
+            ax.set_title('Threshold Sensitivity Analysis: Malicious F1 Score')
+            
+            heatmap_path = paths.outputs_dir / "threshold_sensitivity_heatmap.png"
+            plt.savefig(heatmap_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"  Saved threshold sensitivity heatmap to {heatmap_path}")
 
             args.ae_percentile, args.clf_threshold, args.benign_ctrl_threshold = best_params
             result = best_result
